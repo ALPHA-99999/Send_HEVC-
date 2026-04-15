@@ -1,0 +1,7 @@
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/CameraStreamer.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/LowBandwidthStreamerApp.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/BufferedLowBandwidthStreamerApp.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/mytest.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/test.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/edit_cache.dir
+/home/arty/Downloads/Send_HEVC-main/build-serial/CMakeFiles/rebuild_cache.dir
