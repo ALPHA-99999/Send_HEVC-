@@ -1,0 +1,67 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build send_lb",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "-j2",
+                "--target",
+                "send_lb"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Send LB: File Source (libx265)",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/send_lb",
+            "args": [
+                "file",
+                "/home/arty/Documents/video/1.avi",
+                "libx265"
+            ],
+            "dependsOn": [
+                "Build send_lb"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Send LB: Camera (libx265)",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/send_lb",
+            "args": [
+                "camera",
+                "0",
+                "libx265"
+            ],
+            "dependsOn": [
+                "Build send_lb"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Send LB: Hikrobot (libx265)",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/send_lb",
+            "args": [
+                "--source=hikrobot",
+                "--vid-pid=2bdf:0001",
+                "--gain=14",
+                "libx265"
+            ],
+            "dependsOn": [
+                "Build send_lb"
+            ],
+            "dependsOrder": "sequence",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}
