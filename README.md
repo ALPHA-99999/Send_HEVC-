@@ -1,40 +1,46 @@
-# send_lb
+# Send_HEVC ROS2 Workspace
 
-默认已适配 Ubuntu 的 UDP 推流编译与运行。
+This repository is now a ROS2 workspace rooted at `Send_HEVC-`.
 
-## Ubuntu 依赖
+## Layout
 
-```bash
-sudo apt update
-sudo apt install -y build-essential cmake pkg-config libopencv-dev \
-  libavcodec-dev libavutil-dev libswscale-dev
-```
+- `src/send_lb_capture_preprocess`
+- `src/send_lb_encoder`
+- `src/send_lb_transmitter`
+- `third_party/`
 
-## 编译
-
-```bash
-cmake -S . -B build
-cmake --build build -j
-```
-
-## 运行
+## Build
 
 ```bash
-./build/send_lb file /home/arty/Documents/video/1.avi libx265
-./build/send_lb camera 0 libx265
-./build/send_lb --source=hikrobot --vid-pid=2bdf:0001 libx265
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
 ```
 
-Hikrobot 模式现在使用仓库内的 `third_party/hikrobot` 头文件和库文件，不需要再手动指定 `HIKROBOT_ROOT`。
-Hikrobot 模式会把原始帧自动录到 `/home/arty/Documents/video/` 下，文件名形如 `hikrobot_raw_YYYYMMDD_HHMMSS.avi`，录制文件的 fps 会按相机实际收到的帧率自动估算，不再固定为 27。
-
-串口模式编译（Ubuntu）：
+## Run
 
 ```bash
-cmake -S . -B build -DLOW_BANDWIDTH_TRANSPORT_MODE=2
-cmake --build build -j
+source install/setup.bash
+ros2 launch send_lb_capture_preprocess send_lb.launch.py
 ```
 
-说明：
-- `LOW_BANDWIDTH_TRANSPORT_MODE=1`：UDP
-- `LOW_BANDWIDTH_TRANSPORT_MODE=2`：Serial(raw)
+## Topics
+
+- `/send_lb/image_preprocessed`
+- `/send_lb/hevc_stream`
+
+## Parameters
+
+- `source_type:=file|camera|hikrobot`
+- `transport_mode:=udp|serial`
+- `slice_mode:=fixed|mtu|whole`
+
+## VS Code Tasks
+
+在 VS Code 里可以直接运行这些 task：
+
+- `ROS2: Build all`
+- `ROS2: Launch capture_preprocess`
+- `ROS2: Launch encoder`
+- `ROS2: Launch transmitter`
+
+每个 task 都会单独打开一个终端，不会共用同一个窗口。

@@ -1,67 +1,141 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Build send_lb",
-            "type": "shell",
-            "command": "cmake",
-            "args": [
-                "--build",
-                "${workspaceFolder}/build",
-                "-j2",
-                "--target",
-                "send_lb"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "Send LB: File Source (libx265)",
-            "type": "shell",
-            "command": "${workspaceFolder}/build/send_lb",
-            "args": [
-                "file",
-                "/home/arty/Documents/video/1.avi",
-                "libx265"
-            ],
-            "dependsOn": [
-                "Build send_lb"
-            ],
-            "dependsOrder": "sequence",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "Send LB: Camera (libx265)",
-            "type": "shell",
-            "command": "${workspaceFolder}/build/send_lb",
-            "args": [
-                "camera",
-                "0",
-                "libx265"
-            ],
-            "dependsOn": [
-                "Build send_lb"
-            ],
-            "dependsOrder": "sequence",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "Send LB: Hikrobot (libx265)",
-            "type": "shell",
-            "command": "${workspaceFolder}/build/send_lb",
-            "args": [
-                "--source=hikrobot",
-                "--vid-pid=2bdf:0001",
-                "--gain=14",
-                "libx265"
-            ],
-            "dependsOn": [
-                "Build send_lb"
-            ],
-            "dependsOrder": "sequence",
-            "group": "build",
-            "problemMatcher": []
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ROS2: Build workspace",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Build capture_preprocess",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-select send_lb_capture_preprocess"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Build encoder",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-select send_lb_encoder"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Build transmitter",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-select send_lb_transmitter"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Launch capture_preprocess",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch send_lb_capture_preprocess send_lb.launch.py"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Launch encoder",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run send_lb_encoder encoder_node"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Launch transmitter",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 run send_lb_transmitter transmitter_node"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ROS2: Build all",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "ROS2: Build capture_preprocess",
+        "ROS2: Build encoder",
+        "ROS2: Build transmitter"
+      ],
+      "problemMatcher": []
+    }
+  ]
 }
