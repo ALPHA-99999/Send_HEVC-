@@ -15,13 +15,13 @@
             "problemMatcher": []
         },
         {
-            "label": "Send LB: File Source (libx265)",
+            "label": "Send LB: File Source (hardware/hevc_vaapi)",
             "type": "shell",
             "command": "${workspaceFolder}/build/send_lb",
             "args": [
                 "file",
                 "/home/arty/Documents/video/1.avi",
-                "libx265"
+                "hevc_vaapi"
             ],
             "dependsOn": [
                 "Build send_lb"
@@ -31,13 +31,13 @@
             "problemMatcher": []
         },
         {
-            "label": "Send LB: Camera (libx265)",
+            "label": "Send LB: Camera (hardware/hevc_vaapi)",
             "type": "shell",
             "command": "${workspaceFolder}/build/send_lb",
             "args": [
                 "camera",
                 "0",
-                "libx265"
+                "hevc_vaapi"
             ],
             "dependsOn": [
                 "Build send_lb"
@@ -47,14 +47,14 @@
             "problemMatcher": []
         },
         {
-            "label": "Send LB: Hikrobot (libx265)",
+            "label": "Send LB: Hikrobot (hardware/hevc_vaapi)",
             "type": "shell",
             "command": "${workspaceFolder}/build/send_lb",
             "args": [
                 "--source=hikrobot",
                 "--vid-pid=2bdf:0001",
-                "--gain=14",
-                "libx265"
+                "--gain=16",
+                "hevc_vaapi"
             ],
             "dependsOn": [
                 "Build send_lb"

@@ -110,10 +110,29 @@ bool configureLinuxSerialPort(int fd, std::uint32_t baudRate)
 
 AVPixelFormat chooseEncoderPixelFormat(const std::string& codecName)
 {
+    if (codecName.find("_vaapi") != std::string::npos) {
+        return AV_PIX_FMT_VAAPI;
+    }
     if (codecName.find("_qsv") != std::string::npos) {
-        return AV_PIX_FMT_NV12;
+        return AV_PIX_FMT_QSV;
     }
     return AV_PIX_FMT_YUV420P;
+}
+
+std::string normalizeEncoderName(const std::string& codecName)
+{
+    if (codecName == "libx265" || codecName == "hevc") {
+        return "libx265";
+    }
+    if (codecName == "libx264" || codecName == "h264") {
+        return "libx264";
+    }
+    return codecName;
+}
+
+bool isHardwareVaapiEncoder(const std::string& codecName)
+{
+    return normalizeEncoderName(codecName).find("_vaapi") != std::string::npos;
 }
 
 bool tryOpenCameraDevice(cv::VideoCapture& cap, int cameraIndex)

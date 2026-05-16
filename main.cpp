@@ -35,11 +35,11 @@ int main(int argc, char* argv[])
 {
     signal(SIGINT, lowBandwidthSignalHandler);
 
-    std::string codecName = "libx265";
+    std::string codecName = "hevc_vaapi";
     CaptureSourceType sourceType = CaptureSourceType::File;
     std::string videoPath = "/home/arty/Documents/video/1.avi";
     std::string hikrobotVidPid;
-    double hikrobotExposureMs = 5.0;
+    double hikrobotExposureMs = 15.0;
     double hikrobotGain = 14.0;
     int cameraIndex = 0;
     std::vector<std::string> positional;
@@ -93,8 +93,8 @@ int main(int argc, char* argv[])
             std::cout << "Selected codec: " << codecName << std::endl;
         }
         hikrobotVidPid = get_arg(argc, argv, "--vid-pid", "");
-        hikrobotExposureMs = std::stod(get_arg(argc, argv, "--exposure", "5.0"));
-        hikrobotGain = std::stod(get_arg(argc, argv, "--gain", "0.0"));
+        hikrobotExposureMs = std::stod(get_arg(argc, argv, "--exposure", "15.0"));
+        hikrobotGain = std::stod(get_arg(argc, argv, "--gain", "14.0"));
     }
 
     CaptureConfig captureConfig;
@@ -108,7 +108,8 @@ int main(int argc, char* argv[])
         captureConfig.hikrobotVidPid = hikrobotVidPid;
         captureConfig.hikrobotExposureMs = hikrobotExposureMs;
         captureConfig.hikrobotGain = hikrobotGain;
-        captureConfig.hikrobotRecordFps = 0.0;
+        captureConfig.hikrobotRecordFps = 60.0;
+        captureConfig.hikrobotRecordRawVideo = false;
         captureConfig.videoPath.clear();
     } else {
         captureConfig.videoPath = videoPath;
@@ -126,8 +127,8 @@ int main(int argc, char* argv[])
 
     EncodeConfig encodeConfig;
     encodeConfig.codecName = codecName;
-    encodeConfig.fps = 27;
-    encodeConfig.bitrateKbps = 90;
+    encodeConfig.fps = 30;
+    encodeConfig.bitrateKbps = 100;
     encodeConfig.gopSize = 120;
     encodeConfig.maxBFrames = 2;
     encodeConfig.tune.clear();
@@ -138,6 +139,7 @@ int main(int argc, char* argv[])
     transportConfig.serialPort = "/dev/ttyUSB0";
     transportConfig.serialBaudRate = 921600;
     transportConfig.payloadSize = 292;
+    transportConfig.maxSendHz = 80;
     transportConfig.serialInterPacketDelayMs = 20;
 
     LowBandwidthStreamer streamer(captureConfig, preprocessConfig, encodeConfig, transportConfig);
@@ -173,24 +175,32 @@ int main(int argc, char* argv[])
     uint64_t lastBytesSent = 0;
     uint64_t lastPacketsSent = 0;
     uint64_t lastFramesSent = 0;
+    uint64_t lastEncodeMicros = 0;
     while (g_low_bandwidth_running && streamer.isStreaming()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         const uint64_t bytesSent = streamer.totalBytesSent();
         const uint64_t packetsSent = streamer.totalPacketsSent();
         const uint64_t framesSent = streamer.totalFramesSent();
+        const uint64_t encodeMicros = streamer.totalEncodeMicros();
         const uint64_t deltaBytes = bytesSent - lastBytesSent;
         const uint64_t deltaPackets = packetsSent - lastPacketsSent;
         const uint64_t deltaFrames = framesSent - lastFramesSent;
+        const uint64_t deltaEncodeMicros = encodeMicros - lastEncodeMicros;
+        const double avgEncodeMs = deltaFrames > 0
+            ? static_cast<double>(deltaEncodeMicros) / static_cast<double>(deltaFrames) / 1000.0
+            : 0.0;
 
         std::cout << std::fixed << std::setprecision(2)
                   << "TX " << (static_cast<double>(deltaBytes) / 1024.0) << " KB/s"
                   << " | packets/s " << deltaPackets
                   << " | frames/s " << deltaFrames
+                  << " | encode ms/frame " << avgEncodeMs
                   << std::endl;
 
         lastBytesSent = bytesSent;
         lastPacketsSent = packetsSent;
         lastFramesSent = framesSent;
+        lastEncodeMicros = encodeMicros;
     }
 
     streamer.stopStreaming();

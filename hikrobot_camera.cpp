@@ -27,6 +27,65 @@ std::string sdk_error_hint(unsigned int ret)
   }
   return "";
 }
+
+const char * pixel_type_name(unsigned int pixel_type)
+{
+  switch (static_cast<MvGvspPixelType>(pixel_type)) {
+    case PixelType_Gvsp_Mono8: return "Mono8";
+    case PixelType_Gvsp_HB_Mono8: return "HB_Mono8";
+    case PixelType_Gvsp_BGR8_Packed: return "BGR8_Packed";
+    case PixelType_Gvsp_HB_BGR8_Packed: return "HB_BGR8_Packed";
+    case PixelType_Gvsp_RGB8_Packed: return "RGB8_Packed";
+    case PixelType_Gvsp_HB_RGB8_Packed: return "HB_RGB8_Packed";
+    case PixelType_Gvsp_BayerGR8: return "BayerGR8";
+    case PixelType_Gvsp_BayerRG8: return "BayerRG8";
+    case PixelType_Gvsp_BayerGB8: return "BayerGB8";
+    case PixelType_Gvsp_BayerBG8: return "BayerBG8";
+    case PixelType_Gvsp_HB_BayerGR8: return "HB_BayerGR8";
+    case PixelType_Gvsp_HB_BayerRG8: return "HB_BayerRG8";
+    case PixelType_Gvsp_HB_BayerGB8: return "HB_BayerGB8";
+    case PixelType_Gvsp_HB_BayerBG8: return "HB_BayerBG8";
+    case PixelType_Gvsp_YUV422_Packed: return "YUV422_Packed";
+    case PixelType_Gvsp_YUV422_YUYV_Packed: return "YUV422_YUYV_Packed";
+    case PixelType_Gvsp_HB_YUV422_Packed: return "HB_YUV422_Packed";
+    case PixelType_Gvsp_HB_YUV422_YUYV_Packed: return "HB_YUV422_YUYV_Packed";
+    case PixelType_Gvsp_YCBCR422_8: return "YCBCR422_8";
+    case PixelType_Gvsp_YCBCR422_8_CBYCRY: return "YCBCR422_8_CBYCRY";
+    case PixelType_Gvsp_YCBCR601_422_8: return "YCBCR601_422_8";
+    case PixelType_Gvsp_YCBCR601_422_8_CBYCRY: return "YCBCR601_422_8_CBYCRY";
+    case PixelType_Gvsp_YCBCR709_422_8: return "YCBCR709_422_8";
+    case PixelType_Gvsp_YCBCR709_422_8_CBYCRY: return "YCBCR709_422_8_CBYCRY";
+    default: return "Unknown";
+  }
+}
+
+void log_enum_value(void * handle, const char * key)
+{
+  MVCC_ENUMVALUE value{};
+  const auto ret = MV_CC_GetEnumValue(handle, key, &value);
+  if (ret != MV_OK) {
+    std::cerr << "[warn] MV_CC_GetEnumValue(" << key << ") failed: " << ret << "\n";
+    return;
+  }
+
+  std::cerr << "[info] HikRobot " << key << ": 0x"
+            << std::hex << value.nCurValue << std::dec
+            << " (" << pixel_type_name(value.nCurValue) << ")\n";
+}
+
+void log_frame_rate(void * handle)
+{
+  MVCC_FLOATVALUE value{};
+  const auto ret = MV_CC_GetFrameRate(handle, &value);
+  if (ret != MV_OK) {
+    std::cerr << "[warn] MV_CC_GetFrameRate failed: " << ret << "\n";
+    return;
+  }
+
+  std::cerr << "[info] HikRobot FrameRate: current=" << value.fCurValue
+            << " min=" << value.fMin
+            << " max=" << value.fMax << "\n";
+}
 }  // namespace
 
 HikRobotCamera::HikRobotCamera(double exposure_ms,
@@ -173,14 +232,23 @@ void HikRobotCamera::open()
   }
   device_opened_ = true;
 
-  set_enum_value("BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_CONTINUOUS);
-  set_enum_value("ExposureAuto", MV_EXPOSURE_AUTO_MODE_CONTINUOUS);
+  set_enum_value("TriggerMode", MV_TRIGGER_MODE_OFF);
+  set_enum_value("AcquisitionMode", MV_ACQ_MODE_CONTINUOUS);
+  set_enum_value("BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_OFF);
+  set_enum_value("ExposureAuto", MV_EXPOSURE_AUTO_MODE_OFF);
   set_enum_value("GainAuto", MV_GAIN_MODE_OFF);
+  set_enum_value("PixelFormat", PixelType_Gvsp_BGR8_Packed);
+  set_bool_value("AcquisitionFrameRateEnable", true);
   set_float_value("ExposureTime", exposure_us_);
   set_float_value("Gain", gain_);
   if (requested_record_fps_ > 0.0) {
+    set_float_value("AcquisitionFrameRate", requested_record_fps_);
     MV_CC_SetFrameRate(handle_, static_cast<float>(requested_record_fps_));
   }
+
+  log_enum_value(handle_, "TriggerMode");
+  log_enum_value(handle_, "PixelFormat");
+  log_frame_rate(handle_);
 
   ret = MV_CC_StartGrabbing(handle_);
   if (ret != MV_OK) {
@@ -244,6 +312,14 @@ void HikRobotCamera::set_enum_value(const char * name, unsigned int value)
   const auto ret = MV_CC_SetEnumValue(handle_, name, value);
   if (ret != MV_OK) {
     std::cerr << "[warn] MV_CC_SetEnumValue(" << name << ") failed: " << ret << "\n";
+  }
+}
+
+void HikRobotCamera::set_bool_value(const char * name, bool value)
+{
+  const auto ret = MV_CC_SetBoolValue(handle_, name, value);
+  if (ret != MV_OK) {
+    std::cerr << "[warn] MV_CC_SetBoolValue(" << name << ") failed: " << ret << "\n";
   }
 }
 
@@ -387,15 +463,27 @@ void HikRobotCamera::capture_loop()
     cv::Mat src;
     cv::Mat dst;
 
-    if (pixel_type == PixelType_Gvsp_BGR8_Packed) {
+    if (pixel_type == PixelType_Gvsp_BGR8_Packed || pixel_type == PixelType_Gvsp_HB_BGR8_Packed) {
       src = cv::Mat(frame_info.nHeight, frame_info.nWidth, CV_8UC3, raw.pBufAddr);
       dst = src.clone();
-    } else if (pixel_type == PixelType_Gvsp_RGB8_Packed) {
+    } else if (pixel_type == PixelType_Gvsp_RGB8_Packed || pixel_type == PixelType_Gvsp_HB_RGB8_Packed) {
       src = cv::Mat(frame_info.nHeight, frame_info.nWidth, CV_8UC3, raw.pBufAddr);
       cv::cvtColor(src, dst, cv::COLOR_RGB2BGR);
-    } else if (pixel_type == PixelType_Gvsp_Mono8) {
+    } else if (pixel_type == PixelType_Gvsp_Mono8 || pixel_type == PixelType_Gvsp_HB_Mono8) {
       src = cv::Mat(frame_info.nHeight, frame_info.nWidth, CV_8UC1, raw.pBufAddr);
       cv::cvtColor(src, dst, cv::COLOR_GRAY2BGR);
+    } else if (pixel_type == PixelType_Gvsp_YUV422_Packed ||
+               pixel_type == PixelType_Gvsp_YUV422_YUYV_Packed ||
+               pixel_type == PixelType_Gvsp_HB_YUV422_Packed ||
+               pixel_type == PixelType_Gvsp_HB_YUV422_YUYV_Packed ||
+               pixel_type == PixelType_Gvsp_YCBCR422_8 ||
+               pixel_type == PixelType_Gvsp_YCBCR422_8_CBYCRY ||
+               pixel_type == PixelType_Gvsp_YCBCR601_422_8 ||
+               pixel_type == PixelType_Gvsp_YCBCR601_422_8_CBYCRY ||
+               pixel_type == PixelType_Gvsp_YCBCR709_422_8 ||
+               pixel_type == PixelType_Gvsp_YCBCR709_422_8_CBYCRY) {
+      src = cv::Mat(frame_info.nHeight, frame_info.nWidth, CV_8UC2, raw.pBufAddr);
+      cv::cvtColor(src, dst, cv::COLOR_YUV2BGR_YUY2);
     } else {
       src = cv::Mat(frame_info.nHeight, frame_info.nWidth, CV_8UC1, raw.pBufAddr);
       const static std::unordered_map<MvGvspPixelType, int> kBayerMap = {
@@ -403,6 +491,10 @@ void HikRobotCamera::capture_loop()
         {PixelType_Gvsp_BayerRG8, cv::COLOR_BayerRG2BGR},
         {PixelType_Gvsp_BayerGB8, cv::COLOR_BayerGB2BGR},
         {PixelType_Gvsp_BayerBG8, cv::COLOR_BayerBG2BGR},
+        {PixelType_Gvsp_HB_BayerGR8, cv::COLOR_BayerGR2BGR},
+        {PixelType_Gvsp_HB_BayerRG8, cv::COLOR_BayerRG2BGR},
+        {PixelType_Gvsp_HB_BayerGB8, cv::COLOR_BayerGB2BGR},
+        {PixelType_Gvsp_HB_BayerBG8, cv::COLOR_BayerBG2BGR},
       };
 
       const auto it = kBayerMap.find(pixel_type);

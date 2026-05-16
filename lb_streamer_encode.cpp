@@ -9,30 +9,75 @@
 #include <thread>
 
 bool LowBandwidthStreamer::encodeFrame(const cv::Mat& frame, uint32_t frameIndex) {
-    if (!m_codecContext || !m_yuvFrame || !m_packet) {
+    if (!m_codecContext || !m_packet) {
         return false;
     }
 
     // 把 BGR 画面转成编码器需要的像素格式，再送入 FFmpeg。
-    int ret = av_frame_make_writable(m_yuvFrame);
-    if (ret < 0) {
-        logAvError("Frame not writable", ret);
-        return false;
+    AVFrame* submitFrame = nullptr;
+    if (m_useHardwareEncoder) {
+        if (!m_encodeSwFrame || !m_encodeHwFrame || !m_encodeHwFramesCtx) {
+            return false;
+        }
+
+        int ret = av_frame_make_writable(m_encodeSwFrame);
+        if (ret < 0) {
+            logAvError("Frame not writable", ret);
+            return false;
+        }
+
+        uint8_t* srcSlice[] = {const_cast<uint8_t*>(frame.data)};
+        int srcStride[] = {static_cast<int>(frame.step)};
+        sws_scale(m_swsContext,
+                  srcSlice,
+                  srcStride,
+                  0,
+                  frame.rows,
+                  m_encodeSwFrame->data,
+                  m_encodeSwFrame->linesize);
+
+        av_frame_unref(m_encodeHwFrame);
+        ret = av_hwframe_get_buffer(m_encodeHwFramesCtx, m_encodeHwFrame, 0);
+        if (ret < 0) {
+            logAvError("Could not get VAAPI frame buffer", ret);
+            return false;
+        }
+
+        ret = av_hwframe_transfer_data(m_encodeHwFrame, m_encodeSwFrame, 0);
+        if (ret < 0) {
+            logAvError("Could not transfer frame to VAAPI", ret);
+            return false;
+        }
+
+        m_encodeHwFrame->pts = frameIndex;
+        submitFrame = m_encodeHwFrame;
+    } else {
+        if (!m_yuvFrame) {
+            return false;
+        }
+
+        int ret = av_frame_make_writable(m_yuvFrame);
+        if (ret < 0) {
+            logAvError("Frame not writable", ret);
+            return false;
+        }
+
+        uint8_t* srcSlice[] = {const_cast<uint8_t*>(frame.data)};
+        int srcStride[] = {static_cast<int>(frame.step)};
+        sws_scale(m_swsContext,
+                  srcSlice,
+                  srcStride,
+                  0,
+                  frame.rows,
+                  m_yuvFrame->data,
+                  m_yuvFrame->linesize);
+
+        m_yuvFrame->pts = frameIndex;
+        submitFrame = m_yuvFrame;
     }
 
-    uint8_t* srcSlice[] = {const_cast<uint8_t*>(frame.data)};
-    int srcStride[] = {static_cast<int>(frame.step)};
-    sws_scale(m_swsContext,
-              srcSlice,
-              srcStride,
-              0,
-              frame.rows,
-              m_yuvFrame->data,
-              m_yuvFrame->linesize);
-
-    m_yuvFrame->pts = frameIndex;
-
-    ret = avcodec_send_frame(m_codecContext, m_yuvFrame);
+    const auto encodeStart = std::chrono::steady_clock::now();
+    int ret = avcodec_send_frame(m_codecContext, submitFrame);
     if (ret < 0) {
         logAvError("Error sending frame to encoder", ret);
         return false;
@@ -52,11 +97,13 @@ bool LowBandwidthStreamer::encodeFrame(const cv::Mat& frame, uint32_t frameIndex
             av_packet_unref(m_packet);
             return false;
         }
-        if (!displayDecodedPacket(m_packet)) {
-            av_packet_unref(m_packet);
-            return false;
-        }
         av_packet_unref(m_packet);
+    }
+
+    const auto encodeEnd = std::chrono::steady_clock::now();
+    const auto encodeMicros = std::chrono::duration_cast<std::chrono::microseconds>(encodeEnd - encodeStart).count();
+    if (encodeMicros > 0) {
+        m_totalEncodeMicros.fetch_add(static_cast<uint64_t>(encodeMicros));
     }
 
     return true;
@@ -89,10 +136,6 @@ bool LowBandwidthStreamer::flushEncoder() {
             av_packet_unref(m_packet);
             return false;
         }
-        if (!displayDecodedPacket(m_packet)) {
-            av_packet_unref(m_packet);
-            return false;
-        }
         av_packet_unref(m_packet);
     }
 
@@ -108,10 +151,14 @@ bool LowBandwidthStreamer::sendEncodedPayload(const uint8_t* data, int size, uin
 #if LOW_BANDWIDTH_TRANSPORT_MODE == LOW_BANDWIDTH_TRANSPORT_SERIAL
     using clock = std::chrono::steady_clock;
     static clock::time_point s_nextAllowedPacketSendTime = clock::now();
+    const bool throttlePackets = m_transportConfig.maxSendHz > 0;
     const int maxPacketHz = std::max(1, m_transportConfig.maxSendHz);
     const auto minPacketInterval = std::chrono::microseconds(1000000 / maxPacketHz);
 
     auto waitForPacketSlot = [&]() {
+        if (!throttlePackets) {
+            return;
+        }
         const auto now = clock::now();
         if (now < s_nextAllowedPacketSendTime) {
             std::this_thread::sleep_until(s_nextAllowedPacketSendTime);
@@ -123,10 +170,14 @@ bool LowBandwidthStreamer::sendEncodedPayload(const uint8_t* data, int size, uin
 #if LOW_BANDWIDTH_TRANSPORT_MODE == LOW_BANDWIDTH_TRANSPORT_UDP
     using clock = std::chrono::steady_clock;
     static clock::time_point s_nextAllowedPacketSendTime = clock::now();
-    const auto minPacketInterval = std::chrono::milliseconds(
-        std::max<std::uint32_t>(1, m_transportConfig.serialInterPacketDelayMs));
+    const bool throttlePackets = m_transportConfig.maxSendHz > 0;
+    const int maxPacketHz = std::max(1, m_transportConfig.maxSendHz);
+    const auto minPacketInterval = std::chrono::microseconds(1000000 / maxPacketHz);
 
     auto waitForPacketSlot = [&]() {
+        if (!throttlePackets) {
+            return;
+        }
         const auto now = clock::now();
         if (now < s_nextAllowedPacketSendTime) {
             std::this_thread::sleep_until(s_nextAllowedPacketSendTime);
@@ -186,62 +237,6 @@ bool LowBandwidthStreamer::sendEncodedPayload(const uint8_t* data, int size, uin
 }
 
 bool LowBandwidthStreamer::displayDecodedPacket(const AVPacket* packet) {
-    if (!m_captureConfig.showPreview || !m_decodeContext || !m_decodeFrame || !packet) {
-        return true;
-    }
-
-    int ret = avcodec_send_packet(m_decodeContext, packet);
-    if (ret < 0) {
-        logAvError("Error sending packet to decoder", ret);
-        return false;
-    }
-
-    while (ret >= 0) {
-        ret = avcodec_receive_frame(m_decodeContext, m_decodeFrame);
-        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-            break;
-        }
-        if (ret < 0) {
-            logAvError("Error during decoding", ret);
-            return false;
-        }
-
-        if (!m_decodeSwsContext ||
-            m_decodeSrcWidth != m_decodeFrame->width ||
-            m_decodeSrcHeight != m_decodeFrame->height) {
-            sws_freeContext(m_decodeSwsContext);
-            m_decodeSwsContext = sws_getContext(m_decodeFrame->width,
-                                                m_decodeFrame->height,
-                                                static_cast<AVPixelFormat>(m_decodeFrame->format),
-                                                m_decodeFrame->width,
-                                                m_decodeFrame->height,
-                                                AV_PIX_FMT_BGR24,
-                                                SWS_BILINEAR,
-                                                nullptr,
-                                                nullptr,
-                                                nullptr);
-            if (!m_decodeSwsContext) {
-                std::cerr << "Could not initialize decode sws context" << std::endl;
-                return false;
-            }
-            m_decodeSrcWidth = m_decodeFrame->width;
-            m_decodeSrcHeight = m_decodeFrame->height;
-        }
-
-        cv::Mat decodedBgr(m_decodeFrame->height, m_decodeFrame->width, CV_8UC3);
-        uint8_t* dstSlice[] = {decodedBgr.data};
-        int dstStride[] = {static_cast<int>(decodedBgr.step)};
-        sws_scale(m_decodeSwsContext,
-                  m_decodeFrame->data,
-                  m_decodeFrame->linesize,
-                  0,
-                  m_decodeFrame->height,
-                  dstSlice,
-                  dstStride);
-
-        cv::imshow("Decoded Preview", decodedBgr);
-    }
-
     return true;
 }
 

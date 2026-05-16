@@ -19,12 +19,12 @@
 class HikRobotCamera
 {
 public:
-  HikRobotCamera(double exposure_ms = 5.0,
-                 double gain = 0.0,
+  HikRobotCamera(double exposure_ms = 15.0,
+                 double gain = 14.0,
                  std::string vid_pid = "",
                  std::string record_dir = "/home/arty/Documents/video",
-                 double record_fps = 27.0,
-                 bool record_raw_video = true);
+                 double record_fps = 60.0,
+                 bool record_raw_video = false);
   ~HikRobotCamera();
 
   void read(cv::Mat & img, std::chrono::steady_clock::time_point & timestamp);
@@ -52,6 +52,7 @@ private:
 
   void set_float_value(const char * name, double value);
   void set_enum_value(const char * name, unsigned int value);
+  void set_bool_value(const char * name, bool value);
 
   bool select_device(MV_CC_DEVICE_INFO_LIST & device_list, MV_CC_DEVICE_INFO *& device) const;
   void parse_vid_pid();
