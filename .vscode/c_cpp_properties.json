@@ -6,6 +6,8 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
+        "${workspaceFolder}/include/**",
+        "${workspaceFolder}/src/**",
         "/opt/ros/humble/include/**",
         "/usr/include/**"
       ],

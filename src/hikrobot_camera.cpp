@@ -1,7 +1,5 @@
 #include "hikrobot_camera.hpp"
 
-#ifdef HAVE_HIKROBOT_SDK
-
 #include <cmath>
 #include <cctype>
 #include <ctime>
@@ -549,5 +547,3 @@ void HikRobotCamera::reset_usb() const
   }
   libusb_close(handle);
 }
-
-#endif  // HAVE_HIKROBOT_SDK

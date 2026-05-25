@@ -11,54 +11,54 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(AVCODEC REQUIRED IMPORTED_TARGET libavcodec)
 pkg_check_modules(AVUTIL REQUIRED IMPORTED_TARGET libavutil)
 pkg_check_modules(SWSCALE REQUIRED IMPORTED_TARGET libswscale)
+pkg_check_modules(YAML_CPP REQUIRED IMPORTED_TARGET yaml-cpp)
 
-option(ENABLE_HIKROBOT "Enable Hikrobot camera support if the SDK is available" ON)
 set(HIKROBOT_LOCAL_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/hikrobot/include")
 set(HIKROBOT_LOCAL_LIB "${CMAKE_SOURCE_DIR}/third_party/hikrobot/lib/amd64/libMvCameraControl.so")
 set(LIBUSB_LOCAL_INCLUDE "${CMAKE_SOURCE_DIR}/third_party/libusb/include")
 
 add_executable(send_lb
-    main.cpp
-    lb_streamer.cpp
-    lb_streamer_utils.cpp
-    lb_streamer_roi.cpp
-    lb_streamer_encode.cpp
+    src/main.cpp
+    src/lb_streamer.cpp
+    src/lb_streaming_components.cpp
+    src/lb_streamer_utils.cpp
+    src/hikrobot_camera.cpp
 )
 
 set_target_properties(send_lb PROPERTIES
     OUTPUT_NAME "send_lb"
 )
 
-target_include_directories(send_lb PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_include_directories(send_lb PRIVATE
+    ${OpenCV_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 target_link_libraries(send_lb PRIVATE
     ${OpenCV_LIBS}
     PkgConfig::AVCODEC
     PkgConfig::AVUTIL
     PkgConfig::SWSCALE
+    PkgConfig::YAML_CPP
 )
 
-if(ENABLE_HIKROBOT AND EXISTS "${HIKROBOT_LOCAL_INCLUDE}/MvCameraControl.h" AND EXISTS "${HIKROBOT_LOCAL_LIB}")
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(HIKROBOT_LIBUSB REQUIRED libusb-1.0)
+pkg_check_modules(HIKROBOT_LIBUSB REQUIRED libusb-1.0)
 
-    target_sources(send_lb PRIVATE hikrobot_camera.cpp)
-    target_compile_definitions(send_lb PRIVATE HAVE_HIKROBOT_SDK=1)
-    target_include_directories(send_lb PRIVATE
-        ${HIKROBOT_LOCAL_INCLUDE}
-        ${LIBUSB_LOCAL_INCLUDE}
-    )
-    target_compile_options(send_lb PRIVATE ${HIKROBOT_LIBUSB_CFLAGS_OTHER})
-    target_link_libraries(send_lb PRIVATE
-        ${HIKROBOT_LOCAL_LIB}
-        ${HIKROBOT_LIBUSB_LIBRARIES}
-    )
+target_include_directories(send_lb PRIVATE
+    ${HIKROBOT_LOCAL_INCLUDE}
+    ${LIBUSB_LOCAL_INCLUDE}
+)
+target_compile_options(send_lb PRIVATE ${HIKROBOT_LIBUSB_CFLAGS_OTHER})
+target_link_libraries(send_lb PRIVATE
+    ${HIKROBOT_LOCAL_LIB}
+    ${HIKROBOT_LIBUSB_LIBRARIES}
+)
 
-    # 让运行时优先从仓库里的本地海康库找符号。
-    set_target_properties(send_lb PROPERTIES
-        BUILD_RPATH "${CMAKE_SOURCE_DIR}/third_party/hikrobot/lib/amd64"
-    )
-endif()
+# 让运行时优先从仓库里的本地海康库找符号。
+set_target_properties(send_lb PROPERTIES
+    BUILD_RPATH "${CMAKE_SOURCE_DIR}/third_party/hikrobot/lib/amd64"
+)
 
 if(UNIX AND NOT APPLE)
     target_compile_options(send_lb PRIVATE -pthread)

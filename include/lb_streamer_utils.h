@@ -11,7 +11,15 @@
 
 namespace lb_streamer_detail {
 
-constexpr int kHeaderSize = 8;
+constexpr std::size_t kWirePacketSize = 300;
+constexpr std::size_t kStreamHeaderSize = 16;
+constexpr std::size_t kStreamPayloadSize = kWirePacketSize - kStreamHeaderSize;
+
+constexpr std::uint32_t kStreamMagic = 0x4C425331; // "LBS1"
+constexpr std::uint8_t kStreamVersion = 1;
+
+constexpr std::uint8_t kStreamFlagKeyframe = 1u << 0;
+constexpr std::uint8_t kStreamFlagEndOfStream = 1u << 1;
 
 cv::Mat fitIntoCanvas(const cv::Mat& image, const cv::Size& targetSize, double& scale, cv::Point& offset);
 bool writeSerialAll(int serialHandle, const uint8_t* data, size_t size);

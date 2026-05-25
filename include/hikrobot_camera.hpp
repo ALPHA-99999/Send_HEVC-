@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef HAVE_HIKROBOT_SDK
-
 #include <atomic>
 #include <condition_variable>
 #include <chrono>
@@ -90,5 +88,3 @@ private:
 
   bool libusb_ready_;
 };
-
-#endif  // HAVE_HIKROBOT_SDK

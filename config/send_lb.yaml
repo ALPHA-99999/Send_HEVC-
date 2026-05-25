@@ -1,0 +1,54 @@
+source: camera
+codec_name: hevc_vaapi
+# video_path: /home/arty/Documents/video/1.avi
+camera_index: 0
+
+hikrobot:
+  vid_pid: ""
+  exposure_ms: 15.0
+  gain: 14.0
+  record_dir: /home/arty/Documents/video
+  record_raw_video: false
+  record_fps: 60.0
+
+capture:
+  input_width: 1920
+  input_height: 1080
+  capture_fps: 27
+  show_preview: true
+
+preprocess:
+  enable_roi: true
+  roi:
+    x: 560
+    y: 140
+    width: 800
+    height: 800
+  output_width: 400
+  output_height: 400
+  motion_threshold: 18
+  erode_size: 1
+  dilate_size: 4
+  blur_kernel: 11
+  center_protect_size: 200
+  trail_length: 5
+  trail_disable_ratio: 0.18
+
+encode:
+  codec_name: hevc_vaapi
+  fps: 30
+  bitrate_kbps: 100
+  gop_size: 120
+  max_b_frames: 2
+  preset: slow
+  tune: ""
+
+transport:
+  mode: udp
+  udp_address: 127.0.0.1
+  udp_port: 3334
+  serial_port: /dev/ttyUSB0
+  serial_baud_rate: 921600
+  wire_packet_size: 300
+  max_send_hz: 80
+  serial_inter_packet_delay_ms: 20
